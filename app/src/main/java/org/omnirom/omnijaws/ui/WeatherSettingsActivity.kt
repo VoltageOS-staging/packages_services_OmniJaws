@@ -31,7 +31,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import com.android.internal.util.crdroid.OmniJawsClient
-import com.android.axion.compose.theme.AxionTheme
+import org.omnirom.omnijaws.ui.compose.theme.OmniTheme
 
 class WeatherSettingsActivity : ComponentActivity(), OmniJawsClient.OmniJawsObserver {
 
@@ -61,7 +61,7 @@ class WeatherSettingsActivity : ComponentActivity(), OmniJawsClient.OmniJawsObse
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            AxionTheme {
+            OmniTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.surfaceContainer
