@@ -16,6 +16,7 @@
 package org.omnirom.omnijaws.ui
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -46,12 +47,14 @@ import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -72,6 +75,8 @@ class LocationPickerActivity : ComponentActivity() {
         const val DATA_LOCATION_NAME = "location_name"
         const val DATA_LOCATION_LAT = "location_lat"
         const val DATA_LOCATION_LON = "location_lon"
+        internal const val PREF_KEY_RECENT_LOCATIONS = "recent_locations"
+        internal const val MAX_RECENT_LOCATIONS = 5
         internal const val URL_PLACES =
             "https://secure.geonames.org/searchJSON?name_startsWith=%s&lang=%s&username=omnijaws&maxRows=20"
     }
@@ -116,11 +121,17 @@ private fun LocationPickerScreen(
     onBack: () -> Unit,
     onLocationSelected: (name: String, lat: Double, lon: Double) -> Unit
 ) {
+    val context = LocalContext.current
     var query by remember { mutableStateOf("") }
     var isSearching by remember { mutableStateOf(false) }
     val results = remember { mutableStateListOf<LocationItem>() }
     val scope = rememberCoroutineScope()
     var searchJob by remember { mutableStateOf<Job?>(null) }
+
+    LaunchedEffect(Unit) {
+        results.clear()
+        results.addAll(loadRecentLocations(context))
+    }
 
     OmniScaffold(
         title = "Search location",
@@ -140,6 +151,7 @@ private fun LocationPickerScreen(
                             searchJob?.cancel()
                             if (newQuery.isEmpty()) {
                                 results.clear()
+                                results.addAll(loadRecentLocations(context))
                                 isSearching = false
                             } else {
                                 isSearching = true
@@ -187,6 +199,7 @@ private fun LocationPickerScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
+                                saveRecentLocation(context, location)
                                 onLocationSelected(location.city, location.lat, location.lon)
                             }
                             .padding(vertical = 12.dp, horizontal = 4.dp)
@@ -207,6 +220,52 @@ private fun LocationPickerScreen(
             }
         }
     }
+}
+
+private fun loadRecentLocations(context: Context): List<LocationItem> {
+    val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
+    val json = prefs.getString(LocationPickerActivity.PREF_KEY_RECENT_LOCATIONS, null) ?: return emptyList()
+    return try {
+        val array = org.json.JSONArray(json)
+        buildList {
+            for (i in 0 until array.length()) {
+                val item = array.getJSONObject(i)
+                add(
+                    LocationItem(
+                        city = item.getString("city"),
+                        cityExt = item.getString("cityExt"),
+                        lat = item.getDouble("lat"),
+                        lon = item.getDouble("lon")
+                    )
+                )
+            }
+        }
+    } catch (e: Exception) {
+        Log.w("LocationPicker", "Failed to load recent locations", e)
+        emptyList()
+    }
+}
+
+private fun saveRecentLocation(context: Context, location: LocationItem) {
+    val recents = loadRecentLocations(context)
+        .filterNot { it.city == location.city && it.lat == location.lat && it.lon == location.lon }
+        .toMutableList()
+    recents.add(0, location)
+    val trimmed = recents.take(LocationPickerActivity.MAX_RECENT_LOCATIONS)
+    val array = org.json.JSONArray()
+    trimmed.forEach {
+        array.put(
+            JSONObject()
+                .put("city", it.city)
+                .put("cityExt", it.cityExt)
+                .put("lat", it.lat)
+                .put("lon", it.lon)
+        )
+    }
+    androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
+        .edit()
+        .putString(LocationPickerActivity.PREF_KEY_RECENT_LOCATIONS, array.toString())
+        .apply()
 }
 
 private suspend fun searchLocations(input: String): List<LocationItem> = withContext(Dispatchers.IO) {

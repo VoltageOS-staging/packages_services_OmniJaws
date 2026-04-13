@@ -53,6 +53,7 @@ public class WeatherUpdateService extends JobService {
 
     private static final String EXTRA_ERROR = "error";
 
+    private static final int EXTRA_ERROR_NETWORK = 0;
     private static final int EXTRA_ERROR_LOCATION = 1;
     private static final int EXTRA_ERROR_DISABLED = 2;
 
@@ -106,24 +107,17 @@ public class WeatherUpdateService extends JobService {
     }
 
     private void updateWeatherFromAlarm(JobParameters params) {
-        Config.setUpdateError(this, false);
-
-        try {
-            if (!Config.isEnabled(this)) {
-                Log.w(TAG, "Service started, but not enabled ... stopping");
-                Intent errorIntent = new Intent(ACTION_ERROR);
-                errorIntent.putExtra(EXTRA_ERROR, EXTRA_ERROR_DISABLED);
-                sendBroadcast(errorIntent);
-                return;
-            }
-
-            Config.clearLastUpdateTime(this);
-
-            Log.d(TAG, "updateWeather");
-            updateWeather();
-        } finally {
+        if (!Config.isEnabled(this)) {
+            Log.w(TAG, "Service started, but not enabled ... stopping");
+            Intent errorIntent = new Intent(ACTION_ERROR);
+            errorIntent.putExtra(EXTRA_ERROR, EXTRA_ERROR_DISABLED);
+            sendBroadcast(errorIntent);
             jobFinished(params, false);
+            return;
         }
+
+        Log.d(TAG, "updateWeather");
+        updateWeather(params);
     }
 
     private boolean doCheckLocationEnabled() {
@@ -249,11 +243,12 @@ public class WeatherUpdateService extends JobService {
         context.sendBroadcast(errorIntent);
     }
 
-    private void updateWeather() {
+    private void updateWeather(JobParameters params) {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
                 WeatherInfo w = null;
+                int failureReason = EXTRA_ERROR_NETWORK;
                 try {
                     AbstractWeatherProvider provider = Config.getProvider(WeatherUpdateService.this);
                     int i = 0;
@@ -266,11 +261,13 @@ public class WeatherUpdateService extends JobService {
                                     w = provider.getLocationWeather(location, Config.isMetric(WeatherUpdateService.this));
                                 } else {
                                     Log.w(TAG, "no location yet");
+                                    failureReason = EXTRA_ERROR_LOCATION;
                                     // we are outa here
                                     break;
                                 }
                             } else {
                                 Log.w(TAG, "no location permissions");
+                                failureReason = EXTRA_ERROR_LOCATION;
                                 // we are outa here
                                 break;
                             }
@@ -278,10 +275,12 @@ public class WeatherUpdateService extends JobService {
                             w = provider.getCustomWeather(Config.getLocationId(WeatherUpdateService.this), Config.isMetric(WeatherUpdateService.this));
                         } else {
                             Log.w(TAG, "no valid custom location");
+                            failureReason = EXTRA_ERROR_LOCATION;
                             // we are outa here
                             break;
                         }
                         if (w != null) {
+                            Config.setUpdateError(WeatherUpdateService.this, false);
                             Config.setWeatherData(WeatherUpdateService.this, w);
                             WeatherContentProvider.updateCachedWeatherInfo(WeatherUpdateService.this);
                             WeatherAppWidgetProvider.updateAllWidgets(WeatherUpdateService.this);
@@ -303,16 +302,18 @@ public class WeatherUpdateService extends JobService {
                     }
                 } finally {
                     if (w == null) {
-                        // error
-                        Log.d(TAG, "clear weather data");
+                        Log.d(TAG, "keeping cached weather after update failure");
                         Config.setUpdateError(WeatherUpdateService.this, true);
-                        Config.clearWeatherData(WeatherUpdateService.this);
                         WeatherContentProvider.updateCachedWeatherInfo(WeatherUpdateService.this);
                         WeatherAppWidgetProvider.updateAllWidgets(WeatherUpdateService.this);
+                        Intent errorIntent = new Intent(ACTION_ERROR);
+                        errorIntent.putExtra(EXTRA_ERROR, failureReason);
+                        sendBroadcast(errorIntent);
                     }
                     // send broadcast that something has changed
                     Intent updateIntent = new Intent(ACTION_BROADCAST);
                     sendBroadcast(updateIntent);
+                    jobFinished(params, false);
                 }
             }
         });

@@ -81,6 +81,7 @@ fun WeatherDashboardScreen(
     onRefresh: () -> Unit,
     onSettingsClick: () -> Unit,
     onLocationClick: () -> Unit,
+    onUseDeviceLocation: () -> Unit,
     getConditionIcon: (Int) -> Drawable?
 ) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -91,6 +92,7 @@ fun WeatherDashboardScreen(
         drawerContent = {
             DrawerContent(
                 city = uiState.weatherInfo?.city ?: "",
+                isCustomLocation = uiState.isCustomLocation,
                 onSettingsClick = {
                     scope.launch { drawerState.close() }
                     onSettingsClick()
@@ -98,6 +100,10 @@ fun WeatherDashboardScreen(
                 onLocationClick = {
                     scope.launch { drawerState.close() }
                     onLocationClick()
+                },
+                onUseDeviceLocation = {
+                    scope.launch { drawerState.close() }
+                    onUseDeviceLocation()
                 }
             )
         }
@@ -189,8 +195,10 @@ fun WeatherDashboardScreen(
 @Composable
 private fun DrawerContent(
     city: String,
+    isCustomLocation: Boolean,
     onSettingsClick: () -> Unit,
-    onLocationClick: () -> Unit
+    onLocationClick: () -> Unit,
+    onUseDeviceLocation: () -> Unit
 ) {
     ModalDrawerSheet(
         windowInsets = WindowInsets.statusBars
@@ -215,11 +223,20 @@ private fun DrawerContent(
 
         NavigationDrawerItem(
             icon = { Icon(Icons.Outlined.MyLocation, contentDescription = null) },
-            label = { Text("Location") },
+            label = { Text(if (isCustomLocation) "Pinned location" else "Pin a location") },
             selected = false,
             onClick = onLocationClick,
             modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
         )
+        if (isCustomLocation) {
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Outlined.LocationOn, contentDescription = null) },
+                label = { Text("Use device location") },
+                selected = false,
+                onClick = onUseDeviceLocation,
+                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+            )
+        }
         NavigationDrawerItem(
             icon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
             label = { Text("Settings") },
@@ -248,6 +265,12 @@ private fun WeatherContent(
         ),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        if (weather.isStale || weather.errorReason >= 0) {
+            item {
+                WeatherStatusBanner(weather = weather)
+            }
+        }
+
         item {
             WeatherSummaryRow(
                 weather = weather,
@@ -290,6 +313,28 @@ private fun WeatherContent(
                     .padding(horizontal = 8.dp)
             )
         }
+    }
+}
+
+@Composable
+private fun WeatherStatusBanner(weather: OmniJawsClient.WeatherInfo) {
+    val statusText = when (weather.errorReason) {
+        OmniJawsClient.EXTRA_ERROR_LOCATION -> "Using saved weather while location is unavailable"
+        OmniJawsClient.EXTRA_ERROR_NETWORK -> "Using saved weather while the update fails"
+        OmniJawsClient.EXTRA_ERROR_DISABLED -> "Weather service is disabled"
+        else -> "Showing saved weather"
+    }
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        shape = MaterialTheme.shapes.large,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            text = statusText,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+        )
     }
 }
 

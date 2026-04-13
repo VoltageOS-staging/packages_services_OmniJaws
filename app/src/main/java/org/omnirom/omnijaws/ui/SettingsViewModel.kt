@@ -32,7 +32,7 @@ data class IconPackItem(val label: String, val value: String)
 
 data class SettingsUiState(
     val enabled: Boolean = false,
-    val provider: String = "1",
+    val provider: String = "2",
     val units: String = "0",
     val updateInterval: String = "2",
     val customLocation: Boolean = false,
@@ -44,8 +44,9 @@ data class SettingsUiState(
     val hasLocationPermission: Boolean = false
 ) {
     val providerLabel: String get() = when (provider) {
-        "0" -> "OpenWeatherMap"
-        "1" -> "MET Norway"
+        "0" -> "Open-Meteo"
+        "1" -> "OpenWeatherMap"
+        "2" -> "MET Norway"
         else -> provider
     }
     val unitsLabel: String get() = when (units) {
@@ -74,7 +75,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(ctx)
         _uiState.value = SettingsUiState(
             enabled = Config.isEnabled(ctx),
-            provider = prefs.getString(Config.PREF_KEY_PROVIDER, "1") ?: "1",
+            provider = prefs.getString(Config.PREF_KEY_PROVIDER, "2") ?: "2",
             units = prefs.getString(Config.PREF_KEY_UNITS, "0") ?: "0",
             updateInterval = prefs.getString(Config.PREF_KEY_UPDATE_INTERVAL, "2") ?: "2",
             customLocation = prefs.getBoolean(Config.PREF_KEY_CUSTOM_LOCATION, false),
@@ -129,9 +130,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun setLocationResult(name: String, lat: Double, lon: Double) {
         val locationId = String.format(java.util.Locale.US, "lat=%f&lon=%f", lat, lon)
+        setCustomLocation(true)
         Config.setLocationId(ctx, locationId)
         Config.setLocationName(ctx, name)
-        _uiState.value = _uiState.value.copy(locationName = name)
+        _uiState.value = _uiState.value.copy(customLocation = true, locationName = name)
         scheduleUpdate()
     }
 

@@ -78,6 +78,8 @@ public class WeatherContentProvider extends ContentProvider {
     private static final String COLUMN_LOCATION = "location";
     private static final String COLUMN_SETUP = "setup";
     private static final String COLUMN_ICON_PACK = "icon_pack";
+    private static final String COLUMN_UPDATE_ERROR = "update_error";
+    private static final String COLUMN_LAST_UPDATE = "last_update";
 
     public static final String COLUMN_FORCE_REFRESH = "update";
 
@@ -113,7 +115,9 @@ public class WeatherContentProvider extends ContentProvider {
             COLUMN_UNITS,
             COLUMN_LOCATION,
             COLUMN_SETUP,
-            COLUMN_ICON_PACK
+            COLUMN_ICON_PACK,
+            COLUMN_UPDATE_ERROR,
+            COLUMN_LAST_UPDATE
     };
 
     public static final String AUTHORITY = "org.omnirom.omnijaws.provider";
@@ -157,7 +161,9 @@ public class WeatherContentProvider extends ContentProvider {
                     .add(COLUMN_UNITS, Config.isMetric(mContext) ? 0 : 1)
                     .add(COLUMN_LOCATION, Config.isCustomLocation(mContext) ? Config.getLocationName(mContext) : "")
                     .add(COLUMN_SETUP, !Config.isSetupDone(mContext) && sCachedWeatherInfo == null ? 0 : 1)
-                    .add(COLUMN_ICON_PACK, Config.getIconPack(mContext) != null ? Config.getIconPack(mContext) : "");
+                    .add(COLUMN_ICON_PACK, Config.getIconPack(mContext) != null ? Config.getIconPack(mContext) : "")
+                    .add(COLUMN_UPDATE_ERROR, Config.isUpdateError(mContext) ? 1 : 0)
+                    .add(COLUMN_LAST_UPDATE, Config.getLastUpdateTime(mContext));
 
             return result;
         } else if (projectionType == URI_TYPE_WEATHER) {
@@ -257,5 +263,9 @@ public class WeatherContentProvider extends ContentProvider {
         sCachedWeatherInfo = Config.getWeatherData(context);
         context.getContentResolver().notifyChange(
                 Uri.parse("content://" + WeatherContentProvider.AUTHORITY + "/weather"), null);
+        context.getContentResolver().notifyChange(
+                Uri.parse("content://" + WeatherContentProvider.AUTHORITY + "/hourly"), null);
+        context.getContentResolver().notifyChange(
+                Uri.parse("content://" + WeatherContentProvider.AUTHORITY + "/settings"), null);
     }
 }

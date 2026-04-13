@@ -25,11 +25,13 @@ import com.android.internal.util.crdroid.OmniJawsClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.omnirom.omnijaws.Config
 
 data class WeatherUiState(
     val weatherInfo: OmniJawsClient.WeatherInfo? = null,
     val isLoading: Boolean = true,
-    val error: Int? = null
+    val error: Int? = null,
+    val isCustomLocation: Boolean = false
 )
 
 class WeatherViewModel(application: Application) : AndroidViewModel(application) {
@@ -62,7 +64,12 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         _uiState.value = WeatherUiState(
             weatherInfo = info,
             isLoading = false,
-            error = if (info == null) OmniJawsClient.EXTRA_ERROR_DISABLED else null
+            error = when {
+                info == null -> OmniJawsClient.EXTRA_ERROR_DISABLED
+                info.errorReason >= 0 -> info.errorReason
+                else -> null
+            },
+            isCustomLocation = Config.isCustomLocation(context)
         )
     }
 
@@ -83,5 +90,27 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
 
     fun getConditionIcon(conditionCode: Int): Drawable? {
         return client.getWeatherConditionImage(getApplication(), conditionCode)
+    }
+
+    fun setPinnedLocation(name: String, lat: Double, lon: Double) {
+        val context = getApplication<Application>()
+        val locationId = String.format(java.util.Locale.US, "lat=%f&lon=%f", lat, lon)
+        androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
+            .edit()
+            .putBoolean(Config.PREF_KEY_CUSTOM_LOCATION, true)
+            .commit()
+        Config.setLocationId(context, locationId)
+        Config.setLocationName(context, name)
+        forceRefresh()
+    }
+
+    fun useDeviceLocation() {
+        val context = getApplication<Application>()
+        androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
+            .edit()
+            .putBoolean(Config.PREF_KEY_CUSTOM_LOCATION, false)
+            .commit()
+        _uiState.value = _uiState.value.copy(isCustomLocation = false)
+        forceRefresh()
     }
 }

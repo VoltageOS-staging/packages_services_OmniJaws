@@ -18,9 +18,8 @@ package org.omnirom.omnijaws;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Locale;
-import java.util.Map;
+import java.util.TimeZone;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -28,22 +27,22 @@ import org.json.JSONObject;
 import org.omnirom.omnijaws.WeatherInfo.DayForecast;
 
 import android.content.Context;
-import android.content.res.Resources;
 import android.location.Location;
-import android.text.TextUtils;
 import android.util.Log;
 
 public class MeteoWeatherProvider extends AbstractWeatherProvider {
     private static final String TAG = "MeteoWeatherProvider";
 
     private static final String CURRENT_ARGS =
-            "&current=temperature_2m,relative_humidity_2m,is_day,weather_code,wind_speed_10m,wind_direction_10m";
+            "&current=temperature_2m,relative_humidity_2m,apparent_temperature,dew_point_2m,is_day,weather_code,pressure_msl,wind_speed_10m,wind_direction_10m";
+    private static final String HOURLY_ARGS =
+            "&hourly=temperature_2m,relative_humidity_2m,is_day,weather_code,wind_speed_10m,visibility";
     private static final String DAILY_ARGS =
-            "&daily=weather_code,temperature_2m_max,temperature_2m_min";
+            "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max";
     private static final String IMPERIAL_ARGS =
             "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch";
     private static final String URL_WEATHER =
-            "https://api.open-meteo.com/v1/forecast?%s" + CURRENT_ARGS + DAILY_ARGS + "%s";
+            "https://api.open-meteo.com/v1/forecast?%s" + CURRENT_ARGS + HOURLY_ARGS + DAILY_ARGS + "%s";
 
     public MeteoWeatherProvider(Context context) {
         super(context);
@@ -72,8 +71,8 @@ public class MeteoWeatherProvider extends AbstractWeatherProvider {
         try {
             JSONObject conditions = new JSONObject(conditionResponse);
             JSONObject weather = conditions.getJSONObject("current");
-            ArrayList<DayForecast> forecasts =
-                    parseForecasts(conditions.getJSONObject("daily"), metric);
+            JSONObject daily = conditions.getJSONObject("daily");
+            ArrayList<DayForecast> forecasts = parseForecasts(daily, metric);
             String city = getWeatherDataLocality(selection);
             boolean isDay = weather.getInt("is_day") != 0;
 
@@ -88,6 +87,47 @@ public class MeteoWeatherProvider extends AbstractWeatherProvider {
                     metric,
                     forecasts,
                     System.currentTimeMillis());
+
+            if (weather.has("apparent_temperature")) {
+                w.setFeelsLike((float) weather.getDouble("apparent_temperature"));
+            }
+            if (weather.has("pressure_msl")) {
+                w.setPressure((float) weather.getDouble("pressure_msl"));
+            }
+            if (weather.has("dew_point_2m")) {
+                w.setDewPoint((float) weather.getDouble("dew_point_2m"));
+            }
+            if (daily.has("uv_index_max")) {
+                JSONArray uv = daily.getJSONArray("uv_index_max");
+                if (uv.length() > 0) {
+                    w.setUvi((float) uv.getDouble(0));
+                }
+            }
+            if (daily.has("sunrise")) {
+                JSONArray sunrise = daily.getJSONArray("sunrise");
+                if (sunrise.length() > 0) {
+                    w.setSunrise(parseApiTime(conditions, sunrise.getString(0)));
+                }
+            }
+            if (daily.has("sunset")) {
+                JSONArray sunset = daily.getJSONArray("sunset");
+                if (sunset.length() > 0) {
+                    w.setSunset(parseApiTime(conditions, sunset.getString(0)));
+                }
+            }
+            if (conditions.has("hourly")) {
+                JSONObject hourly = conditions.getJSONObject("hourly");
+                ArrayList<WeatherInfo.HourlyForecast> hourlyForecasts =
+                        parseHourlyForecasts(conditions, hourly, metric);
+                w.setHourlyForecasts(hourlyForecasts);
+                if (hourly.has("visibility")) {
+                    JSONArray visibility = hourly.getJSONArray("visibility");
+                    if (visibility.length() > 0) {
+                        float rawVisibility = (float) visibility.getDouble(0);
+                        w.setVisibility(metric ? rawVisibility / 1000f : rawVisibility / 1609.34f);
+                    }
+                }
+            }
 
             log(TAG, "Weather updated: " + w);
             return w;
@@ -146,6 +186,44 @@ public class MeteoWeatherProvider extends AbstractWeatherProvider {
             }
         }
         return result;
+    }
+
+    private ArrayList<WeatherInfo.HourlyForecast> parseHourlyForecasts(
+            JSONObject root, JSONObject hourly, boolean metric) throws JSONException {
+        ArrayList<WeatherInfo.HourlyForecast> result = new ArrayList<>();
+        JSONArray time = hourly.getJSONArray("time");
+        JSONArray temperature = hourly.getJSONArray("temperature_2m");
+        JSONArray weatherCode = hourly.getJSONArray("weather_code");
+        JSONArray humidity = hourly.getJSONArray("relative_humidity_2m");
+        JSONArray windSpeed = hourly.getJSONArray("wind_speed_10m");
+        JSONArray isDay = hourly.optJSONArray("is_day");
+        int count = Math.min(time.length(), 24);
+
+        for (int i = 0; i < count; i++) {
+            boolean hourIsDay = isDay == null || isDay.optInt(i, 1) != 0;
+            result.add(new WeatherInfo.HourlyForecast(
+                    (float) temperature.getDouble(i),
+                    mapConditionIconToCode(weatherCode.getInt(i), hourIsDay),
+                    getConditionForCode(weatherCode.getInt(i)),
+                    parseApiTime(root, time.getString(i)),
+                    (float) humidity.getDouble(i),
+                    (float) windSpeed.getDouble(i),
+                    metric));
+        }
+
+        return result;
+    }
+
+    private long parseApiTime(JSONObject root, String value) {
+        try {
+            java.text.SimpleDateFormat parser =
+                    new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm", Locale.US);
+            parser.setTimeZone(TimeZone.getTimeZone(root.optString("timezone", "UTC")));
+            return parser.parse(value).getTime();
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to parse API time " + value, e);
+            return 0L;
+        }
     }
 
     private static String getConditionForCode(int code) {

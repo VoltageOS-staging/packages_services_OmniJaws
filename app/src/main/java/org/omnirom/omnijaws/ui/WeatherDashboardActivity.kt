@@ -20,6 +20,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -29,6 +30,18 @@ import org.omnirom.omnijaws.ui.compose.theme.OmniTheme
 class WeatherDashboardActivity : ComponentActivity(), OmniJawsClient.OmniJawsObserver {
 
     private val viewModel: WeatherViewModel by viewModels()
+    private val locationPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val data = result.data ?: return@registerForActivityResult
+            val name = data.getStringExtra(LocationPickerActivity.DATA_LOCATION_NAME)
+                ?: return@registerForActivityResult
+            val lat = data.getDoubleExtra(LocationPickerActivity.DATA_LOCATION_LAT, 0.0)
+            val lon = data.getDoubleExtra(LocationPickerActivity.DATA_LOCATION_LON, 0.0)
+            viewModel.setPinnedLocation(name, lat, lon)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,6 +54,7 @@ class WeatherDashboardActivity : ComponentActivity(), OmniJawsClient.OmniJawsObs
                     onRefresh = { viewModel.forceRefresh() },
                     onSettingsClick = { openSettings() },
                     onLocationClick = { openLocationPicker() },
+                    onUseDeviceLocation = { viewModel.useDeviceLocation() },
                     getConditionIcon = { viewModel.getConditionIcon(it) }
                 )
             }
@@ -71,6 +85,6 @@ class WeatherDashboardActivity : ComponentActivity(), OmniJawsClient.OmniJawsObs
     }
 
     private fun openLocationPicker() {
-        startActivity(Intent(this, LocationPickerActivity::class.java))
+        locationPickerLauncher.launch(Intent(this, LocationPickerActivity::class.java))
     }
 }

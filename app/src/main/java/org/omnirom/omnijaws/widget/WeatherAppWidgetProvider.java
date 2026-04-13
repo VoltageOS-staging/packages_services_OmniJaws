@@ -69,6 +69,7 @@ public class WeatherAppWidgetProvider extends AppWidgetProvider {
     private static final String TAG = "WeatherAppWidgetProvider";
     private static final boolean LOGGING = false;
     private static final int EXTRA_ERROR_DISABLED = 2;
+    private static final String FORCE_UPDATE = "org.omnirom.omnijaws.FORCE_UPDATE";
 
     @Override
     public void onEnabled(Context context) {
@@ -173,6 +174,12 @@ public class WeatherAppWidgetProvider extends AppWidgetProvider {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
+    private static PendingIntent getRefreshIntent(Context context, int appWidgetId) {
+        Intent refreshIntent = new Intent(FORCE_UPDATE).setPackage(context.getPackageName());
+        return PendingIntent.getBroadcast(context, appWidgetId, refreshIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
     public static void updateWeather(
             Context context, AppWidgetManager appWidgetManager, int appWidgetId) {
 
@@ -198,6 +205,9 @@ public class WeatherAppWidgetProvider extends AppWidgetProvider {
 
         initWidget(widget);
         widget.setOnClickPendingIntent(R.id.weather_data, getWeatherActivityIntent(context));
+        PendingIntent refreshIntent = getRefreshIntent(context, appWidgetId);
+        widget.setOnClickPendingIntent(R.id.current_image, refreshIntent);
+        widget.setOnClickPendingIntent(R.id.current_data, refreshIntent);
 
         if (weatherData == null) {
             Log.e(TAG, "updateWeather weatherData == null");
@@ -263,13 +273,22 @@ public class WeatherAppWidgetProvider extends AppWidgetProvider {
         widget.setTextViewText(R.id.forecast_data_4, forecastData);
 
         String currentData = getWeatherDataString(weatherData.temp, null, weatherData.tempUnits);
+        if (weatherData.isStale) {
+            currentData = currentData
+                    + context.getResources().getString(R.string.omnijaws_service_error_marker);
+        }
         d = OmniJawsClient.get().getWeatherConditionImage(context, weatherData.conditionCode);
         bd = getBitmapDrawable(context, d);
         widget.setImageViewBitmap(R.id.current_image, bd.getBitmap());
         widget.setTextViewText(R.id.current_text,
-                context.getResources().getText(R.string.omnijaws_current_text));
+                context.getResources().getText(
+                        weatherData.isStale
+                                ? R.string.omnijaws_widget_saved_label
+                                : R.string.omnijaws_current_text));
         widget.setTextViewText(R.id.current_data, currentData);
-        widget.setTextViewText(R.id.current_weather_city, weatherData.city);
+        widget.setTextViewText(R.id.current_weather_city, weatherData.isStale
+                ? context.getString(R.string.omnijaws_widget_saved_city, weatherData.city)
+                : weatherData.city);
         widget.setImageViewResource(R.id.current_humidity_image,
                 R.drawable.ic_humidity_symbol_small);
         widget.setTextViewText(R.id.current_humidity, weatherData.humidity);

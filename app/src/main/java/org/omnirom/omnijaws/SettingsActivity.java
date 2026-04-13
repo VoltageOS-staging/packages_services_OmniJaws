@@ -17,22 +17,23 @@
  */
 package org.omnirom.omnijaws;
 
+import android.content.Intent;
 import android.os.Bundle;
 
 import com.android.settingslib.collapsingtoolbar.CollapsingToolbarBaseActivity;
+
+import org.omnirom.omnijaws.ui.WeatherSettingsActivity;
 
 public class SettingsActivity extends CollapsingToolbarBaseActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-    }
-
-    @Override
-    protected void onPostCreate(Bundle savedInstanceState) {
-        super.onPostCreate(savedInstanceState);
-        getSupportFragmentManager().beginTransaction().replace(
-                com.android.settingslib.collapsingtoolbar.R.id.content_frame,
-                new SettingsFragment()).commit();
+        Intent intent = new Intent(this, WeatherSettingsActivity.class);
+        if (getIntent() != null && getIntent().getExtras() != null) {
+            intent.putExtras(getIntent().getExtras());
+        }
+        startActivity(intent);
+        finish();
     }
 }
