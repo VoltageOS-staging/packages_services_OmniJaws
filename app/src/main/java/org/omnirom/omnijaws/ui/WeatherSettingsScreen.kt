@@ -39,11 +39,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.android.axion.compose.preferences.ClickablePreference
-import com.android.axion.compose.preferences.ListPreference
-import com.android.axion.compose.preferences.PreferenceGroup
-import com.android.axion.compose.preferences.SwitchPreference
-import com.android.axion.compose.scaffold.AxionScaffold
+import org.omnirom.omnijaws.ui.compose.preferences.ClickablePreference
+import org.omnirom.omnijaws.ui.compose.preferences.ListPreference
+import org.omnirom.omnijaws.ui.compose.preferences.PreferenceGroup
+import org.omnirom.omnijaws.ui.compose.preferences.SwitchPreference
+import org.omnirom.omnijaws.ui.compose.scaffold.OmniScaffold
 
 @Composable
 fun WeatherSettingsScreen(
@@ -59,7 +59,7 @@ fun WeatherSettingsScreen(
     onOwmKeyChanged: (String) -> Unit,
     onRequestLocationPermission: () -> Unit
 ) {
-    AxionScaffold(
+    OmniScaffold(
         title = "Weather settings",
         onBackClick = onBack
     ) { padding ->
@@ -88,7 +88,7 @@ fun WeatherSettingsScreen(
                         ListPreference(
                             title = "Weather provider",
                             summary = state.providerLabel,
-                            options = listOf("0" to "OpenWeatherMap", "1" to "MET Norway"),
+                            options = listOf("0" to "Open-Meteo", "1" to "OpenWeatherMap", "2" to "MET Norway"),
                             value = state.provider,
                             onValueChange = onProviderChanged
                         )
@@ -173,7 +173,7 @@ fun WeatherSettingsScreen(
                     }
                 }
 
-                if (state.provider == "0") {
+                if (state.provider == "1") {
                     PreferenceGroup(title = "API") {
                         item {
                             EditTextPreference(

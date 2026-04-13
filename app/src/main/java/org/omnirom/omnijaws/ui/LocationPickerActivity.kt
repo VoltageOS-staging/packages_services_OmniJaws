@@ -55,8 +55,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.android.axion.compose.scaffold.AxionScaffold
-import com.android.axion.compose.theme.AxionTheme
+import org.omnirom.omnijaws.ui.compose.scaffold.OmniScaffold
+import org.omnirom.omnijaws.ui.compose.theme.OmniTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -80,7 +80,7 @@ class LocationPickerActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            AxionTheme {
+            OmniTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.surfaceContainer
@@ -122,7 +122,7 @@ private fun LocationPickerScreen(
     val scope = rememberCoroutineScope()
     var searchJob by remember { mutableStateOf<Job?>(null) }
 
-    AxionScaffold(
+    OmniScaffold(
         title = "Search location",
         onBackClick = onBack
     ) { padding ->

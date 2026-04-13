@@ -276,6 +276,12 @@ public class METNorwayProvider extends AbstractWeatherProvider {
         return result;
     }
 
+    private static final SimpleDateFormat gmt0Format;
+    static {
+        gmt0Format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
+        gmt0Format.setTimeZone(TimeZone.getTimeZone("UTC"));
+    }
+
 	private static final HashMap<String, String> WEATHER_CONDITION_MAPPING = new HashMap<>();
 	static {
 		WEATHER_CONDITION_MAPPING.put("clearsky", "Clear Sky");
